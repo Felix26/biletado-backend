@@ -6,12 +6,12 @@ from .helpers import Helpers
 main_bp = Blueprint('main', __name__)
 
 # --- HELPER ---
-def error_resp(code, msg, status=400):
+def error_resp(code, msg, logUUID, status=400):
     if status in (400, 401, 404):
         return make_response(jsonify({}), status)
     return make_response(jsonify({
         "errors": [{"code": code, "message": msg}],
-        "trace": str(uuid.uuid4()) # TODO: This uuid should occur in the logs
+        "trace": str(logUUID)
     }), status)
 
 @main_bp.route('/api/v3/reservations/status', methods=['GET'])
@@ -33,7 +33,9 @@ def get_health():
             }
         })
     except Exception as e:
-        return error_resp("service_unavailable", "Database check failed", 503)
+        logUUID = uuid.uuid4()
+
+        return error_resp("service_unavailable", "Database check failed", logUUID, 503)
 
 @main_bp.route('/api/v3/reservations/health/live', methods=['GET'])
 def get_liveness():
@@ -43,7 +45,9 @@ def get_liveness():
             "live": True
         })
     except Exception as e:
-        return error_resp("service_unavailable", "Liveness check failed", 503)
+        logUUID = uuid.uuid4()
+
+        return error_resp("service_unavailable", "Liveness check failed", logUUID, 503)
     
 @main_bp.route('/api/v3/reservations/health/ready', methods=['GET'])
 def get_readiness():
@@ -55,4 +59,11 @@ def get_readiness():
             "ready": True,
         })
     except Exception as e:
-        return error_resp("service_unavailable", "Readiness check failed", 503)
+        logUUID = uuid.uuid4()
+
+        return error_resp("service_unavailable", "Readiness check failed",logUUID, 503)
+    
+
+
+
+
