@@ -3,13 +3,13 @@ import uuid
 from datetime import datetime
 
 from .helpers import Helpers
-from .models import Reservation
+from .models import Reservation, db
 
 main_bp = Blueprint('main', __name__)
 
 # --- HELPER ---
 def error_resp(code, msg, logUUID, status=400, more_info="not provided"):
-    if status in (400, 401, 404):
+    if status in (401, 404):
         return make_response(jsonify({}), status)
     return make_response(jsonify({
         "errors": [{"code": code, "message": msg, "more_info": more_info}],
@@ -136,3 +136,47 @@ def get_reservations():
         })
 
         return error_resp("internal_error", "Error fetching reservations", logUUID, 500, str(e))
+
+@main_bp.route('/api/v3/reservations/reservations', methods=['POST'])
+def create_reservation():
+    data = request.json
+    try:
+        req_from = datetime.fromisoformat(data['from']).date()
+        req_to = datetime.fromisoformat(data['to']).date()
+        room_id = uuid.UUID(data['room_id'])
+        
+        if req_from >= req_to:
+            return error_resp("bad_request", "From must be before To", str(uuid.uuid4()), 400, "'from' date must be before 'to' date")
+    except (KeyError, ValueError, TypeError) as e:
+        return error_resp("bad_request", "Invalid Input", str(uuid.uuid4()), 400, str(e))
+
+    # Overlap Check via DB (SQLAlchemy)
+    overlap = Reservation.query.filter(
+        Reservation.room_id == room_id,
+        Reservation.deleted_at == None,
+        Reservation.start_date < req_to,
+        Reservation.end_date > req_from
+    ).first()
+
+    if overlap:
+        return error_resp("bad_request", "Overlap detected", str(uuid.uuid4()), 400, "The requested reservation overlaps with an existing reservation.")
+
+    new_res = Reservation(
+        room_id=room_id,
+        start_date=req_from,
+        end_date=req_to
+    )
+    db.session.add(new_res)
+    db.session.commit()
+
+    current_app.logger.info("Reservation created", extra={
+        "action": "CREATE",
+        "object_type": "reservation",
+        "object_id": new_res.id,
+        "user_id": getattr(request, 'user_id', 'anonymous')
+    })
+
+    resp = make_response(jsonify(new_res.to_dict()), 201)
+    resp.headers['Location'] = f"/api/v3/reservations/reservations/{new_res.id}"
+    return resp
+
