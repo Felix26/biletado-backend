@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, make_response, current_app, request
 import uuid
+from datetime import datetime
 
 from .helpers import Helpers
 from .models import Reservation
@@ -97,20 +98,41 @@ def get_readiness():
 
 @main_bp.route('/api/v3/reservations/reservations', methods=['GET'])
 def get_reservations():
-    
-    # Query Params
-    include_deleted = request.args.get('include_deleted', 'false').lower() == 'true'
-    room_id = request.args.get('room_id')
-    before = request.args.get('before')
-    after = request.args.get('after')
-    
-    query = Reservation.query
+    results = []
+    try:
+        # Query Params
+        include_deleted = request.args.get('include_deleted', 'false').lower() == 'true'
+        room_id = request.args.get('room_id')
+        before = request.args.get('before')
+        after = request.args.get('after')
+        
+        query = Reservation.query
 
-    if not include_deleted:
-        query = query.filter(Reservation.deleted_at == None)
-    
-    if room_id:
-        query = query.filter(Reservation.room_id == room_id)
+        if not include_deleted:
+            query = query.filter(Reservation.deleted_at == None)
+        
+        if room_id:
+            query = query.filter(Reservation.room_id == room_id)
 
-    results = [r.to_dict() for r in query.all()]
-    return jsonify({"reservations": results})
+        if after:
+            after_date = datetime.fromisoformat(after).date()
+            query = query.filter(Reservation.end_date > after_date)
+
+        if before:
+            before_date = datetime.fromisoformat(before).date()
+            query = query.filter(Reservation.start_date < before_date)
+
+        results = [r.to_dict() for r in query.all()]
+        return jsonify({"reservations": results})
+    
+    except Exception as e:
+        logUUID = uuid.uuid4()
+
+        current_app.logger.error("Error fetching reservations", extra={
+            "event.action": "get_reservations",
+            "error.message": str(e),
+            "trace.id": logUUID,
+            "service.name": "reservations-api"
+        })
+
+        return error_resp("internal_error", "Error fetching reservations", logUUID, 500, str(e))
