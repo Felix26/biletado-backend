@@ -6,11 +6,11 @@ from .helpers import Helpers
 main_bp = Blueprint('main', __name__)
 
 # --- HELPER ---
-def error_resp(code, msg, logUUID, status=400):
+def error_resp(code, msg, logUUID, status=400, more_info="not provided"):
     if status in (400, 401, 404):
         return make_response(jsonify({}), status)
     return make_response(jsonify({
-        "errors": [{"code": code, "message": msg}],
+        "errors": [{"code": code, "message": msg, "more_info": more_info}],
         "trace": str(logUUID)
     }), status)
 
