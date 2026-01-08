@@ -202,6 +202,7 @@ def get_reservation(res_id):
     return jsonify(res.to_dict())
 
 @main_bp.route('/api/v3/reservations/reservations/<string:res_id>', methods=['PUT'])
+#TODO: Auth
 def update_reservation(res_id):
     data = request.json
     try:
