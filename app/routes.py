@@ -27,7 +27,7 @@ def get_health():
             "live": True,
             "ready": True,
             "databases": {
-                "assets": {
+                "reservations": {
                     "connected": True
                 }
             }
