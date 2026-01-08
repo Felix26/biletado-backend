@@ -4,6 +4,8 @@ from flask_cors import CORS
 from pythonjsonlogger import jsonlogger
 import logging
 
+from sqlalchemy import create_engine
+
 def create_app():
     app = Flask(__name__)
 
@@ -19,5 +21,13 @@ def create_app():
     # Blueprints/Routes registrieren
     from .routes import main_bp
     app.register_blueprint(main_bp)
+
+    
+    # 1. Connection String definieren
+    # Format: postgresql+psycopg://USER:PASSWORD@HOST:PORT/DB_NAME
+    db_url = "postgresql+psycopg://postgres:postgres@localhost:50000/reservations_v3" #TODO: Aus Konfiguration laden
+
+    # 2. Engine erstellen (Verwalter der Verbindung)
+    app.engine = create_engine(db_url, connect_args={"connect_timeout": 2})
 
     return app

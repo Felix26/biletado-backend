@@ -22,16 +22,20 @@ def get_status():
 def get_health():
     # Check DB Connection
     try:
-        Helpers.getDatabaseReady()
-        return jsonify({
-            "live": True,
-            "ready": True,
-            "databases": {
-                "reservations": {
-                    "connected": True
+        readyness, db_error = Helpers.getDatabaseReady()
+        if readyness:
+            return jsonify({
+                "live": True,
+                "ready": True,
+                "databases": {
+                    "reservations": {
+                        "connected": True
+                    }
                 }
-            }
-        })
+            })
+        else:
+            raise Exception("Database not reachable: " + db_error)
+        
     except Exception as e:
         logUUID = uuid.uuid4()
 
@@ -42,7 +46,7 @@ def get_health():
             "service.name": "reservations-api"
         })
 
-        return error_resp("service_unavailable", "Database check failed", logUUID, 503)
+        return error_resp("service_unavailable", "Database check failed", logUUID, 503, str(e))
 
 @main_bp.route('/api/v3/reservations/health/live', methods=['GET'])
 def get_liveness():
@@ -68,10 +72,14 @@ def get_readiness():
     # Eine Readiness-Probe prüft, ob der Service bereit ist, Anfragen zu verarbeiten.
     # Hierzu gehört auch die Datenbank-Verbindung.
     try:
-        Helpers.getDatabaseReady()
-        return jsonify({
-            "ready": True,
-        })
+        readyness, db_error = Helpers.getDatabaseReady()
+        if readyness:
+            return jsonify({
+                "ready": True,
+            })
+        else:
+            raise Exception("Database not ready: " + db_error)
+        
     except Exception as e:
         logUUID = uuid.uuid4()
 
@@ -82,7 +90,7 @@ def get_readiness():
             "service.name": "reservations-api"
         })
 
-        return error_resp("service_unavailable", "Readiness check failed",logUUID, 503)
+        return error_resp("service_unavailable", "Readiness check failed",logUUID, 503, str(e))
     
 
 
