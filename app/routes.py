@@ -9,12 +9,15 @@ main_bp = Blueprint('main', __name__)
 
 # --- HELPER ---
 def error_resp(code, msg, logUUID, status=400, more_info="not provided"):
-    if status in (401):
+    if status == 401:
         return make_response(jsonify({}), status)
     return make_response(jsonify({
         "errors": [{"code": code, "message": msg, "more_info": more_info}],
         "trace": str(logUUID)
     }), status)
+
+# --- ROUTES ---
+# --- STATUS AND HEALTHCHECK ENDPOINTS ---
 
 @main_bp.route('/api/v3/reservations/status', methods=['GET'])
 def get_status():
@@ -95,6 +98,7 @@ def get_readiness():
         return error_resp("service_unavailable", "Readiness check failed",logUUID, 503, str(e))
     
 
+# --- RESERVATIONS ENDPOINTS ---
 
 @main_bp.route('/api/v3/reservations/reservations', methods=['GET'])
 def get_reservations():
@@ -170,10 +174,11 @@ def create_reservation():
     db.session.commit()
 
     current_app.logger.info("Reservation created", extra={
-        "action": "CREATE",
-        "object_type": "reservation",
-        "object_id": new_res.id,
-        "user_id": getattr(request, 'user_id', 'anonymous')
+        "event.action": "create",
+        "resource.type": "reservation",
+        "resource.id": str(new_res.id),
+        "user.id": getattr(request, 'user_id', 'anonymous'),
+        "service.name": "reservations-api"
     })
 
     resp = make_response(jsonify(new_res.to_dict()), 201)
@@ -186,12 +191,50 @@ def get_reservation(res_id):
         valid_uuid = uuid.UUID(res_id)
     except ValueError:
         # Ungültige UUID
-        return error_resp("not_found", "Not found", 404)
+        return error_resp("not_found", "Not found", str(uuid.uuid4()), 404)
 
     res = Reservation.query.get(valid_uuid)
     
     if not res:
         # Ungültige Reservation ID
-        return error_resp("not_found", "Not found", 404)
+        return error_resp("not_found", "Not found", str(uuid.uuid4()), 404)
         
     return jsonify(res.to_dict())
+
+#TODO: PUT Endpoint
+
+@main_bp.route('/api/v3/reservations/reservations/<string:res_id>', methods=['DELETE'])
+#TODO: Auth
+def delete_reservation(res_id):
+    permanent = request.args.get('permanent', 'false').lower() == 'true'
+    try:
+        uuid_res_id = uuid.UUID(res_id)
+    except (ValueError, AttributeError):
+        return error_resp("invalid_id", "Reservation ID is not a valid UUID", str(uuid.uuid4()), 400)
+    res = Reservation.query.get(uuid_res_id)
+
+    if not res or (res.deleted_at and not permanent):
+         return error_resp("not_found", "Not found", str(uuid.uuid4()), 404)
+
+    if permanent:
+        db.session.delete(res)
+        action = "DELETE_PERMANENT"
+    else:
+        res.deleted_at = Helpers.get_current_time()
+        action = "SOFT_DELETE"
+    
+    db.session.commit()
+
+    # Audit Log
+    # Audit Log
+    current_app.logger.info("Reservation deleted", extra={
+        # ECS Standard Felder
+        "event.action": action,
+        "resource.type": "reservation",
+        "resource.id": str(res_id),
+        "user.id": getattr(request, 'user_id', 'anonymous'),
+        "service.name": "reservations-api"
+    })
+
+    return '', 204
+

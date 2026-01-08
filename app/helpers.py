@@ -1,5 +1,6 @@
 from flask import current_app
 from sqlalchemy import text, select
+from datetime import datetime, timezone
 
 from .models import Reservation, db
 
@@ -30,3 +31,6 @@ class Helpers:
     #         return {"reservations": [res.to_dict() for res in reservations]}
     #     else:
     #         return {"message": "Datenbank ist leer"}
+
+    def get_current_time():
+        return datetime.now(timezone.utc)
