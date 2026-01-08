@@ -201,7 +201,92 @@ def get_reservation(res_id):
         
     return jsonify(res.to_dict())
 
-#TODO: PUT Endpoint
+@main_bp.route('/api/v3/reservations/reservations/<string:res_id>', methods=['PUT'])
+def update_reservation(res_id):
+    data = request.json
+    try:
+        valid_uuid = uuid.UUID(res_id)
+    except ValueError:
+        return error_resp("not_found", "Invalid reservation UUID", str(uuid.uuid4()), 400)
+    
+
+    wants_restore = ("deleted_at" in data and data["deleted_at"] is None)
+
+    existing = Reservation.query.get(valid_uuid)
+    if not existing or (existing.deleted_at and not wants_restore):
+        return error_resp("not_found", "Not found", str(uuid.uuid4()), 400, "Reservation does not exist or is deleted.")
+    
+    # Wenn restore gewünscht und Reservation existiert & ist deleted:
+    if existing is not None and existing.deleted_at is not None and wants_restore:
+        # Spec: Prototype muss enthalten sein
+        for k in ("room_id", "from", "to"):
+            if k not in data:
+                return error_resp("bad_request", "Prototype required to restore (room_id, from, to)", str(uuid.uuid4()), 400)
+            
+    # Die Reservierung existiert (ggf. gelöscht), aber ein Update ist gewünscht
+    try:
+        req_from = datetime.fromisoformat(data['from']).date()
+        req_to = datetime.fromisoformat(data['to']).date()
+        room_id = uuid.UUID(data['room_id'])
+        
+        if req_from >= req_to:
+            return error_resp("bad_request", "From must be before To", str(uuid.uuid4()), 400, "'from' date must be before 'to' date")
+    except (KeyError, ValueError, TypeError) as e:
+        return error_resp("bad_request", "Invalid Input", str(uuid.uuid4()), 400, str(e))
+    
+    # Overlap Check via DB (SQLAlchemy)
+    overlap = Reservation.query.filter(
+        Reservation.room_id == room_id,
+        Reservation.deleted_at == None,
+        Reservation.start_date < req_to,
+        Reservation.end_date > req_from,
+    )
+
+    # Wenn Update einer bestehenden Reservation, diese von Overlap ausschließen
+    if existing and existing.deleted_at is None:
+        overlap = overlap.filter(Reservation.id != existing.id)
+
+    overlap = overlap.first()
+    if overlap:
+        return error_resp("bad_request", "Overlap detected", str(uuid.uuid4()), 400, "The requested reservation overlaps with an existing reservation.")
+    
+    # Alle Checks bestanden, Update durchführen. Differenziere zwischen Update und Create
+    created = False
+    if existing is None:
+        created = True
+        res = Reservation(id=valid_uuid)
+        db.session.add(existing)
+    else:
+        res = existing
+
+    # Update Felder
+    res.room_id = room_id
+    res.start_date = req_from
+    res.end_date = req_to
+
+    # Wenn restore gewünscht
+    if wants_restore:
+        res.deleted_at = None
+
+    db.session.commit()
+
+    # Antwort und Audit Log
+    if created: action = "CREATE"
+    if wants_restore: action = "RESTORE"
+    else: action = "UPDATE"
+
+    current_app.logger.info(f"Reservation {action.lower()}d", extra={
+        "event.action": action,
+        "resource.type": "reservation",
+        "resource.id": str(res.id),
+        "user.id": getattr(request, 'user_id', 'anonymous'),
+        "service.name": "reservations-api"
+        })
+
+    resp = make_response(jsonify(res.to_dict()), 200 if not created else 201)
+    if created:
+        resp.headers['Location'] = f"/api/v3/reservations/reservations/{res.id}"
+    return resp
 
 @main_bp.route('/api/v3/reservations/reservations/<string:res_id>', methods=['DELETE'])
 #TODO: Auth
@@ -226,9 +311,7 @@ def delete_reservation(res_id):
     db.session.commit()
 
     # Audit Log
-    # Audit Log
     current_app.logger.info("Reservation deleted", extra={
-        # ECS Standard Felder
         "event.action": action,
         "resource.type": "reservation",
         "resource.id": str(res_id),
