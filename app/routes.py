@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, make_response
+from flask import Blueprint, jsonify, make_response, current_app
 import uuid
 
 from .helpers import Helpers
@@ -35,6 +35,13 @@ def get_health():
     except Exception as e:
         logUUID = uuid.uuid4()
 
+        current_app.logger.error("Health check failed", extra={
+            "event.action": "health_check",
+            "error.message": str(e),
+            "trace.id": logUUID,
+            "service.name": "reservations-api"
+        })
+
         return error_resp("service_unavailable", "Database check failed", logUUID, 503)
 
 @main_bp.route('/api/v3/reservations/health/live', methods=['GET'])
@@ -46,6 +53,13 @@ def get_liveness():
         })
     except Exception as e:
         logUUID = uuid.uuid4()
+
+        current_app.logger.error("Liveness check failed", extra={
+            "event.action": "health_check",
+            "error.message": str(e),
+            "trace.id": logUUID,
+            "service.name": "reservations-api"
+        })
 
         return error_resp("service_unavailable", "Liveness check failed", logUUID, 503)
     
@@ -60,6 +74,13 @@ def get_readiness():
         })
     except Exception as e:
         logUUID = uuid.uuid4()
+
+        current_app.logger.error("Readiness check failed", extra={
+            "event.action": "health_check",
+            "error.message": str(e),
+            "trace.id": logUUID,
+            "service.name": "reservations-api"
+        })
 
         return error_resp("service_unavailable", "Readiness check failed",logUUID, 503)
     
