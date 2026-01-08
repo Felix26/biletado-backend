@@ -9,7 +9,7 @@ main_bp = Blueprint('main', __name__)
 
 # --- HELPER ---
 def error_resp(code, msg, logUUID, status=400, more_info="not provided"):
-    if status in (401, 404):
+    if status in (401):
         return make_response(jsonify({}), status)
     return make_response(jsonify({
         "errors": [{"code": code, "message": msg, "more_info": more_info}],
@@ -180,3 +180,18 @@ def create_reservation():
     resp.headers['Location'] = f"/api/v3/reservations/reservations/{new_res.id}"
     return resp
 
+@main_bp.route('/api/v3/reservations/reservations/<string:res_id>', methods=['GET'])
+def get_reservation(res_id):
+    try:
+        valid_uuid = uuid.UUID(res_id)
+    except ValueError:
+        # Ungültige UUID
+        return error_resp("not_found", "Not found", 404)
+
+    res = Reservation.query.get(valid_uuid)
+    
+    if not res:
+        # Ungültige Reservation ID
+        return error_resp("not_found", "Not found", 404)
+        
+    return jsonify(res.to_dict())
