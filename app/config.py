@@ -25,3 +25,4 @@ class Config:
     KEYCLOAK_REALM = os.getenv('KEYCLOAK_REALM', 'biletado')
     
     KEYCLOAK_URL = f"http://{KEYCLOAK_HOST}/auth/realms/{KEYCLOAK_REALM}"
+    KEYCLOAK_CERTS_URL = f"http://{KEYCLOAK_HOST}/auth/realms/{KEYCLOAK_REALM}/protocol/openid-connect/certs"

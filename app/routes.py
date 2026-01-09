@@ -4,6 +4,7 @@ from datetime import datetime
 
 from .helpers import Helpers
 from .models import Reservation, db
+from .auth import require_auth
 
 main_bp = Blueprint('main', __name__)
 
@@ -290,7 +291,7 @@ def update_reservation(res_id):
     return resp
 
 @main_bp.route('/api/v3/reservations/reservations/<string:res_id>', methods=['DELETE'])
-#TODO: Auth
+@require_auth
 def delete_reservation(res_id):
     permanent = request.args.get('permanent', 'false').lower() == 'true'
     try:
