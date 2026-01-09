@@ -90,3 +90,5 @@ venv.bak/
 *.sqlite
 *.sqlite3
 instance/
+
+*.tar

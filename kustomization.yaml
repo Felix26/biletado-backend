@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - https://gitlab.com/biletado/kustomize.git//overlays/kind
+
+patches:
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: docker.io/library/biletado-backend:latest
+      - op: replace
+        path: /spec/template/spec/containers/0/ports/0/containerPort
+        value: 9099
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: DEBUG_SERVER
+          value: "False"
+
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: reservations
