@@ -18,3 +18,10 @@ class Config:
     DEBUG_SERVER = os.getenv("DEBUG_SERVER", "False").lower() in ("true", "1", "t")
 
     SERVER_PORT = int(os.getenv("SERVER_PORT", 80))
+
+
+    # Keycloak Konfiguration
+    KEYCLOAK_HOST = os.getenv('KEYCLOAK_HOST', 'localhost:9090')
+    KEYCLOAK_REALM = os.getenv('KEYCLOAK_REALM', 'biletado')
+    
+    KEYCLOAK_URL = f"http://{KEYCLOAK_HOST}/auth/realms/{KEYCLOAK_REALM}"
