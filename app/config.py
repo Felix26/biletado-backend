@@ -14,3 +14,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+
+    DEBUG_SERVER = os.getenv("DEBUG_SERVER", "False").lower() in ("true", "1", "t")
+
+    SERVER_PORT = int(os.getenv("SERVER_PORT", 80))

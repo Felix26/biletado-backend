@@ -1,10 +1,11 @@
-from app import create_app
 from dotenv import load_dotenv
 
 load_dotenv()
 
+from app import create_app
+from app.config import Config
+
 app = create_app()
 
 if __name__ == '__main__':
-    # Startet den Server auf Port 9099 (zum Test)
-    app.run(host='0.0.0.0', port=9099, debug=True)
+    app.run(host='0.0.0.0', port=Config.SERVER_PORT, debug=Config.DEBUG_SERVER)
