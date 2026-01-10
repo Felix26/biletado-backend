@@ -192,13 +192,13 @@ def get_reservation(res_id):
         valid_uuid = uuid.UUID(res_id)
     except ValueError:
         # Ungültige UUID
-        return error_resp("not_found", "Not found", str(uuid.uuid4()), 404)
+        return error_resp("bad_request", "Not found", str(uuid.uuid4()), 404)
 
     res = Reservation.query.get(valid_uuid)
     
     if not res:
         # Ungültige Reservation ID
-        return error_resp("not_found", "Not found", str(uuid.uuid4()), 404)
+        return error_resp("bad_request", "Not found", str(uuid.uuid4()), 404)
         
     return jsonify(res.to_dict())
 
@@ -312,7 +312,7 @@ def delete_reservation(res_id):
         "event.action": action,
         "resource.type": "reservation",
         "resource.id": str(res_id),
-        "user.id": getattr(request, 'user_id', 'anonymous'),
+        "user.id": getattr(request, 'user_id', request.user_id),
         "service.name": "reservations-api"
     })
 
