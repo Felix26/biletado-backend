@@ -317,7 +317,7 @@ def delete_reservation(res_id):
         "event.action": action,
         "resource.type": "reservation",
         "resource.id": str(res_id),
-        "user.id": getattr(request, 'user_id', 'anonymous'),
+        "user.id": getattr(request, 'user_id', request.user_id),
         "service.name": "reservations-api"
     })
 
