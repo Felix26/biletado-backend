@@ -1,4 +1,12 @@
-from flask import Blueprint, jsonify, make_response, current_app, request
+"""HTTP routes for the reservations API.
+
+This module registers the 'main' blueprint and exposes health/status
+endpoints and CRUD endpoints for reservations.
+"""
+
+from typing import Any
+
+from flask import Blueprint, jsonify, make_response, current_app, request, Response
 import uuid
 from datetime import datetime
 
@@ -9,7 +17,19 @@ from .auth import require_auth
 main_bp = Blueprint('main', __name__)
 
 # --- HELPER ---
-def error_resp(code, msg, logUUID, status=400, more_info="not provided"):
+def error_resp(code: str, msg: str, logUUID: uuid.UUID, status: int = 400, more_info: str = "not provided") -> Response:
+    """Create a standardized error response payload.
+
+    Args:
+        code: Short error code string.
+        msg: Human-readable error message.
+        logUUID: UUID used for tracing the log entry.
+        status: HTTP status code to return.
+        more_info: Optional machine-readable details.
+
+    Returns:
+        A Flask 'Response' containing the JSON error payload.
+    """
     if status == 401:
         return make_response(jsonify({}), status)
     return make_response(jsonify({
@@ -21,11 +41,22 @@ def error_resp(code, msg, logUUID, status=400, more_info="not provided"):
 # --- STATUS AND HEALTHCHECK ENDPOINTS ---
 
 @main_bp.route('/api/v3/reservations/status', methods=['GET'])
-def get_status():
+def get_status() -> Response:
+    """Return basic status information about the API.
+
+    The endpoint is intentionally lightweight and used for informational
+    purposes (not a health check).
+    """
     return jsonify({"authors": ["Felix Miller", "Nik Wachsmann", "Ben Stahl"], "api_version": "3.0.0"})
 
 @main_bp.route('/api/v3/reservations/health', methods=['GET'])
-def get_health():
+def get_health() -> Response:
+    """Perform a combined liveness/readiness check including DB.
+
+    Returns a JSON object describing liveness, readiness and database
+    connectivity. On failure, logs a traceable UUID and returns a
+    standardized error response.
+    """
     # Check DB Connection
     try:
         readyness, db_error = Helpers.getDatabaseReady()
@@ -55,8 +86,11 @@ def get_health():
         return error_resp("service_unavailable", "Database check failed", logUUID, 503, str(e))
 
 @main_bp.route('/api/v3/reservations/health/live', methods=['GET'])
-def get_liveness():
-    # Eine Liveness-Probe prüft normalerweise, ob der Webserver antwortet. try-except ist hier etwas witzlos, wenn jsonify fehlschlägt, dann ist dem System gar nicht mehr zu helfen
+def get_liveness() -> Response:
+    """Simple liveness probe.
+
+    This endpoint validates that the webserver can respond.
+    """
     try:
         return jsonify({
             "live": True
@@ -74,9 +108,12 @@ def get_liveness():
         return error_resp("service_unavailable", "Liveness check failed", logUUID, 503)
     
 @main_bp.route('/api/v3/reservations/health/ready', methods=['GET'])
-def get_readiness():
-    # Eine Readiness-Probe prüft, ob der Service bereit ist, Anfragen zu verarbeiten.
-    # Hierzu gehört auch die Datenbank-Verbindung.
+def get_readiness() -> Response:
+    """Readiness probe that confirms the service can handle requests.
+
+    For this service readiness includes a successful database
+    connection check.
+    """
     try:
         readyness, db_error = Helpers.getDatabaseReady()
         if readyness:
@@ -102,14 +139,25 @@ def get_readiness():
 # --- RESERVATIONS ENDPOINTS ---
 
 @main_bp.route('/api/v3/reservations/reservations', methods=['GET'])
-def get_reservations():
+def get_reservations() -> Response:
+    """Retrieve reservations with optional query filters.
+
+    Supported query parameters:
+      - include_deleted: if 'true', include soft-deleted reservations
+      - room_id: filter by room UUID
+      - before: ISO date string to filter reservations starting before this date
+      - after: ISO date string to filter reservations ending after this date
+
+    Returns:
+        JSON response containing the 'reservations' list.
+    """
     results = []
     try:
         # Query Params
-        include_deleted = request.args.get('include_deleted', 'false').lower() == 'true'
-        room_id = request.args.get('room_id')
-        before = request.args.get('before')
-        after = request.args.get('after')
+        include_deleted = request.args.get("include_deleted", "false").lower() == "true"
+        room_id = request.args.get("room_id")
+        before = request.args.get("before")
+        after = request.args.get("after")
         
         query = Reservation.query
 
@@ -143,12 +191,25 @@ def get_reservations():
         return error_resp("internal_error", "Error fetching reservations", logUUID, 500, str(e))
 
 @main_bp.route('/api/v3/reservations/reservations', methods=['POST'])
-def create_reservation():
+def create_reservation() -> Response:
+    """Create a new reservation from JSON request body.
+
+    Expected JSON body:
+      {
+        "room_id": "<uuid>",
+        "from": "YYYY-MM-DD",
+        "to": "YYYY-MM-DD"
+      }
+
+    Returns:
+        201 Created with the reservation payload and 'Location' header on success
+        or a standardized error response on failure.
+    """
     data = request.json
     try:
-        req_from = datetime.fromisoformat(data['from']).date()
-        req_to = datetime.fromisoformat(data['to']).date()
-        room_id = uuid.UUID(data['room_id'])
+        req_from = datetime.fromisoformat(data["from"]).date()
+        req_to = datetime.fromisoformat(data["to"]).date()
+        room_id = uuid.UUID(data["room_id"])
         
         if req_from >= req_to:
             return error_resp("bad_request", "From must be before To", str(uuid.uuid4()), 400, "'from' date must be before 'to' date")
@@ -187,24 +248,35 @@ def create_reservation():
     return resp
 
 @main_bp.route('/api/v3/reservations/reservations/<string:res_id>', methods=['GET'])
-def get_reservation(res_id):
+def get_reservation(res_id: str) -> Response:
+    """Return a single reservation by its UUID string.
+
+    Args:
+        res_id: Reservation ID as string (UUID format).
+    """
     try:
         valid_uuid = uuid.UUID(res_id)
     except ValueError:
-        # Ungültige UUID
+        # Invalid UUID
         return error_resp("not_found", "Not found", str(uuid.uuid4()), 404)
 
     res = Reservation.query.get(valid_uuid)
     
     if not res:
-        # Ungültige Reservation ID
+        # Reservation ID not found
         return error_resp("not_found", "Not found", str(uuid.uuid4()), 404)
         
     return jsonify(res.to_dict())
 
 @main_bp.route('/api/v3/reservations/reservations/<string:res_id>', methods=['PUT'])
 #TODO: Auth
-def update_reservation(res_id):
+def update_reservation(res_id: str) -> Response:
+    """Update or restore an existing reservation.
+
+    This endpoint supports both updating an existing reservation and
+    restoring a soft-deleted one. When restoring, the payload must
+    include a prototype ('room_id', 'from', 'to').
+    """
     data = request.json
     try:
         valid_uuid = uuid.UUID(res_id)
@@ -292,8 +364,13 @@ def update_reservation(res_id):
 
 @main_bp.route('/api/v3/reservations/reservations/<string:res_id>', methods=['DELETE'])
 @require_auth
-def delete_reservation(res_id):
-    permanent = request.args.get('permanent', 'false').lower() == 'true'
+def delete_reservation(res_id: str) -> Any:
+    """Delete a reservation either soft or permanently.
+
+    Query parameter 'permanent=true' will perform a permanent delete;
+    otherwise the reservation is soft-deleted by setting 'deleted_at'.
+    """
+    permanent = request.args.get("permanent", "false").lower() == "true"
     try:
         uuid_res_id = uuid.UUID(res_id)
     except (ValueError, AttributeError):
@@ -321,5 +398,5 @@ def delete_reservation(res_id):
         "service.name": "reservations-api"
     })
 
-    return '', 204
+    return "", 204
 

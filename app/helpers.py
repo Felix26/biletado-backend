@@ -1,12 +1,36 @@
+"""Helper utilities for infrastructure and DB checks.
+
+This module provides small helpers that e.g. verify the database
+connection is available and a central time helper.
+"""
+
+from typing import Tuple
+
 from flask import current_app
 from sqlalchemy import text, select
 from datetime import datetime, timezone
 
 from .models import Reservation, db
 
-class Helpers:
 
-    def getDatabaseReady():
+class Helpers:
+    """Collection of small helper routines.
+
+    Methods are defined as '@staticmethod' because they do not require
+    access to instance or class state.
+    """
+
+    @staticmethod
+    def getDatabaseReady() -> Tuple[bool, str]:
+        """Check whether the database connection is available.
+
+        Executes a simple, safe SQL statement ('SELECT 1') and returns a
+        tuple containing a boolean success flag and an error message
+        (empty string on success).
+
+        Returns:
+            Tuple[bool, str]: '(ready, message)' — 'message' is empty on success.
+        """
         try:
             with current_app.engine.connect().execution_options(timeout=2) as connection:
                 # Ein sicheres SQL-Statement ausführen
@@ -32,5 +56,11 @@ class Helpers:
     #     else:
     #         return {"message": "Datenbank ist leer"}
 
-    def get_current_time():
+    @staticmethod
+    def get_current_time() -> datetime:
+        """Return the current time in UTC.
+
+        Returns:
+            datetime: timezone-aware 'datetime' in UTC.
+        """
         return datetime.now(timezone.utc)
