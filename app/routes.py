@@ -203,7 +203,7 @@ def get_reservation(res_id):
     return jsonify(res.to_dict())
 
 @main_bp.route('/api/v3/reservations/reservations/<string:res_id>', methods=['PUT'])
-def update_reservation(res_id):
+def update_reservation_endpoint(res_id):
     data = request.json
     try:
         valid_uuid = uuid.UUID(res_id)
@@ -211,16 +211,18 @@ def update_reservation(res_id):
         return error_resp("not_found", "Invalid reservation UUID", str(uuid.uuid4()), 400)
     
 
-    wants_restore = ("deleted_at" in data and data["deleted_at"] is None)
-
     existing = Reservation.query.get(valid_uuid)
 
     # Neue Reservation erstellen, wenn nicht existent
     if not existing:
         return create_reservation()
 
-    ## TODO: Insert auth here
+    return update_reservation(existing, data)
 
+@require_auth
+def update_reservation(existing, data):
+
+    wants_restore = ("deleted_at" in data and data["deleted_at"] is None)
     if existing.deleted_at and not wants_restore:
         return error_resp("not_found", "Not found", str(uuid.uuid4()), 400, "Reservation does not exist or is deleted.")
     
