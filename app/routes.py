@@ -257,26 +257,19 @@ def get_reservation(res_id: str) -> Response:
     try:
         valid_uuid = uuid.UUID(res_id)
     except ValueError:
-        # Invalid UUID
-        return error_resp("not_found", "Not found", str(uuid.uuid4()), 404)
+        # Ungültige UUID
+        return error_resp("bad_request", "Not found", str(uuid.uuid4()), 404)
 
     res = Reservation.query.get(valid_uuid)
     
     if not res:
-        # Reservation ID not found
-        return error_resp("not_found", "Not found", str(uuid.uuid4()), 404)
+        # Ungültige Reservation ID
+        return error_resp("bad_request", "Not found", str(uuid.uuid4()), 404)
         
     return jsonify(res.to_dict())
 
 @main_bp.route('/api/v3/reservations/reservations/<string:res_id>', methods=['PUT'])
-#TODO: Auth
-def update_reservation(res_id: str) -> Response:
-    """Update or restore an existing reservation.
-
-    This endpoint supports both updating an existing reservation and
-    restoring a soft-deleted one. When restoring, the payload must
-    include a prototype ('room_id', 'from', 'to').
-    """
+def update_reservation_endpoint(res_id):
     data = request.json
     try:
         valid_uuid = uuid.UUID(res_id)
@@ -284,14 +277,23 @@ def update_reservation(res_id: str) -> Response:
         return error_resp("not_found", "Invalid reservation UUID", str(uuid.uuid4()), 400)
     
 
-    wants_restore = ("deleted_at" in data and data["deleted_at"] is None)
-
     existing = Reservation.query.get(valid_uuid)
-    if not existing or (existing.deleted_at and not wants_restore):
+
+    # Neue Reservation erstellen, wenn nicht existent
+    if not existing:
+        return create_reservation()
+
+    return update_reservation(existing, data)
+
+@require_auth
+def update_reservation(existing, data):
+
+    wants_restore = ("deleted_at" in data and data["deleted_at"] is None)
+    if existing.deleted_at and not wants_restore:
         return error_resp("not_found", "Not found", str(uuid.uuid4()), 400, "Reservation does not exist or is deleted.")
     
     # Wenn restore gewünscht und Reservation existiert & ist deleted:
-    if existing is not None and existing.deleted_at is not None and wants_restore:
+    if existing.deleted_at is not None and wants_restore:
         # Spec: Prototype muss enthalten sein
         for k in ("room_id", "from", "to"):
             if k not in data:
@@ -317,50 +319,39 @@ def update_reservation(res_id: str) -> Response:
     )
 
     # Wenn Update einer bestehenden Reservation, diese von Overlap ausschließen
-    if existing and existing.deleted_at is None:
+    if existing.deleted_at is None:
         overlap = overlap.filter(Reservation.id != existing.id)
 
     overlap = overlap.first()
     if overlap:
         return error_resp("bad_request", "Overlap detected", str(uuid.uuid4()), 400, "The requested reservation overlaps with an existing reservation.")
-    
-    # Alle Checks bestanden, Update durchführen. Differenziere zwischen Update und Create
-    created = False
-    if existing is None:
-        created = True
-        res = Reservation(id=valid_uuid)
-        db.session.add(existing)
-    else:
-        res = existing
+
+    updated_res = existing
 
     # Update Felder
-    res.room_id = room_id
-    res.start_date = req_from
-    res.end_date = req_to
+    updated_res.room_id = room_id
+    updated_res.start_date = req_from
+    updated_res.end_date = req_to
 
     # Wenn restore gewünscht
     if wants_restore:
-        res.deleted_at = None
+        updated_res.deleted_at = None
 
     db.session.commit()
 
     # Antwort und Audit Log
-    if created: action = "CREATE"
     if wants_restore: action = "RESTORE"
     else: action = "UPDATE"
 
     current_app.logger.info(f"Reservation {action.lower()}d", extra={
         "event.action": action,
         "resource.type": "reservation",
-        "resource.id": str(res.id),
-        "user.id": getattr(request, 'user_id', 'anonymous'),
+        "resource.id": str(updated_res.id),
+        "user.id": getattr(request, 'user_id', request.user_id),
         "service.name": "reservations-api"
         })
 
-    resp = make_response(jsonify(res.to_dict()), 200 if not created else 201)
-    if created:
-        resp.headers['Location'] = f"/api/v3/reservations/reservations/{res.id}"
-    return resp
+    return make_response(jsonify(updated_res.to_dict()), 200)
 
 @main_bp.route('/api/v3/reservations/reservations/<string:res_id>', methods=['DELETE'])
 @require_auth
@@ -394,7 +385,7 @@ def delete_reservation(res_id: str) -> Any:
         "event.action": action,
         "resource.type": "reservation",
         "resource.id": str(res_id),
-        "user.id": getattr(request, 'user_id', 'anonymous'),
+        "user.id": getattr(request, 'user_id', request.user_id),
         "service.name": "reservations-api"
     })
 
