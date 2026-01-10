@@ -281,7 +281,7 @@ def update_reservation(existing, data):
         "event.action": action,
         "resource.type": "reservation",
         "resource.id": str(updated_res.id),
-        "user.id": getattr(request, 'user_id', 'anonymous'),
+        "user.id": getattr(request, 'user_id', request.user_id),
         "service.name": "reservations-api"
         })
 
