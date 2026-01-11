@@ -22,4 +22,5 @@ jobs:
 
     - name: Run tests with pytest
       run: |
-        pytest
+        export PYTHONPATH=$PYTHONPATH:$(pwd)
+        pytest --junitxml=result.xml
