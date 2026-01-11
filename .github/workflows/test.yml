@@ -6,6 +6,10 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      packages: write
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -20,7 +24,33 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: Install Podman
+      run: sudo apt-get update && sudo apt-get install -y podman
+
     - name: Run tests with pytest
       run: |
         export PYTHONPATH=$PYTHONPATH:$(pwd)
         pytest --junitxml=result.xml
+
+    - name: Upload Test Results
+      if: always() # Uploads even if tests fail
+      uses: actions/upload-artifact@v4
+      with:
+        name: pytest-results
+        path: result.xml
+
+    - name: Log in to GHCR
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
+
+    - name: Build Image with Podman
+      run: |
+        podman build -t biletado-backend:latest .
+
+    - name: Tag and Push Image
+      run: |
+        # Convert repository owner to lowercase
+        IMAGE_ID=ghcr.io/${{ github.repository_owner }}/biletado-backend
+        IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+        
+        podman tag biletado-backend:latest $IMAGE_ID:latest
+        podman push $IMAGE_ID:latest

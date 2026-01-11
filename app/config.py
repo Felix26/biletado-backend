@@ -40,7 +40,7 @@ class Config:
 
     SQLALCHEMY_TRACK_MODIFICATIONS: ClassVar[bool] = False
 
-    LOG_LEVEL: ClassVar[str] = os.getenv("LOG_LEVEL", "INFO").upper()
+    LOG_LEVEL: ClassVar[str] = os.getenv("LOG_LEVEL", "INFO").strip().upper()
 
     DEBUG_SERVER: ClassVar[bool] = os.getenv("DEBUG_SERVER", "False").lower() in (
         "true",
