@@ -6,6 +6,10 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      packages: write
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -35,6 +39,18 @@ jobs:
         name: pytest-results
         path: result.xml
 
+    - name: Log in to GHCR
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
+
     - name: Build Image with Podman
       run: |
         podman build -t biletado-backend:latest .
+
+    - name: Tag and Push Image
+      run: |
+        # Convert repository owner to lowercase
+        IMAGE_ID=ghcr.io/${{ github.repository_owner }}/biletado-backend
+        IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+        
+        podman tag biletado-backend:latest $IMAGE_ID:latest
+        podman push $IMAGE_ID:latest
