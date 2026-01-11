@@ -4,23 +4,34 @@ kind: Kustomization
 resources:
   - https://gitlab.com/biletado/kustomize.git//overlays/kind
 
+secretGenerator:
+  - name: biletado-env-secret
+    envs:
+      - .env
+
 patches:
   - patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/image
-        value: docker.io/library/biletado-backend:2
+        value: docker.io/library/biletado-backend:latest
       - op: replace
         path: /spec/template/spec/containers/0/ports/0/containerPort
         value: 9099
       - op: replace
         path: /spec/template/spec/containers/0/imagePullPolicy
         value: Never
+      
       - op: add
         path: /spec/template/spec/containers/0/env/-
         value:
           name: DEBUG_SERVER
           value: "False"
 
+      - op: add
+        path: /spec/template/spec/containers/0/envFrom
+        value:
+          - secretRef:
+              name: biletado-env-secret
     target:
       group: apps
       version: v1
