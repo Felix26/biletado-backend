@@ -1,28 +1,60 @@
+"""Application configuration.
+
+This module exposes central configuration values for the application.
+Values are primarily read from environment variables and converted to
+appropriate Python types. The 'Config' class acts as a container for
+these constants (suitable for Flask app configuration).
+"""
+
 import os
+from typing import ClassVar
+
 
 class Config:
-    POSTGRES_RESERVATIONS_DBNAME = os.getenv("POSTGRES_RESERVATIONS_DBNAME", "reservations_v3")
-    POSTGRES_RESERVATIONS_HOST = os.getenv("POSTGRES_RESERVATIONS_HOST", "localhost")
-    POSTGRES_RESERVATIONS_USER = os.getenv("POSTGRES_RESERVATIONS_USER", "postgres")
-    POSTGRES_RESERVATIONS_PASSWORD = os.getenv("POSTGRES_RESERVATIONS_PASSWORD", "postgres")
-    POSTGRES_RESERVATIONS_PORT = os.getenv("POSTGRES_RESERVATIONS_PORT", "5432")
+    """Container for application configuration.
 
-    SQLALCHEMY_DATABASE_URI = (
-        f'postgresql+psycopg://{POSTGRES_RESERVATIONS_USER}:{POSTGRES_RESERVATIONS_PASSWORD}@{POSTGRES_RESERVATIONS_HOST}:{POSTGRES_RESERVATIONS_PORT}/{POSTGRES_RESERVATIONS_DBNAME}'
+    Attributes are annotated as class variables so type-checkers and IDEs
+    can infer expected types. Values are initialized from environment
+    variables at import time.
+    """
+
+    POSTGRES_RESERVATIONS_DBNAME: ClassVar[str] = os.getenv(
+        "POSTGRES_RESERVATIONS_DBNAME", "reservations_v3"
+    )
+    POSTGRES_RESERVATIONS_HOST: ClassVar[str] = os.getenv(
+        "POSTGRES_RESERVATIONS_HOST", "localhost"
+    )
+    POSTGRES_RESERVATIONS_USER: ClassVar[str] = os.getenv(
+        "POSTGRES_RESERVATIONS_USER", "postgres"
+    )
+    POSTGRES_RESERVATIONS_PASSWORD: ClassVar[str] = os.getenv(
+        "POSTGRES_RESERVATIONS_PASSWORD", "postgres"
+    )
+    POSTGRES_RESERVATIONS_PORT: ClassVar[str] = os.getenv(
+        "POSTGRES_RESERVATIONS_PORT", "5432"
     )
 
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
-    LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+    SQLALCHEMY_DATABASE_URI: ClassVar[str] = (
+        f"postgresql+psycopg://{POSTGRES_RESERVATIONS_USER}:{POSTGRES_RESERVATIONS_PASSWORD}@{POSTGRES_RESERVATIONS_HOST}:{POSTGRES_RESERVATIONS_PORT}/{POSTGRES_RESERVATIONS_DBNAME}"
+    )
 
-    DEBUG_SERVER = os.getenv("DEBUG_SERVER", "False").lower() in ("true", "1", "t")
+    SQLALCHEMY_TRACK_MODIFICATIONS: ClassVar[bool] = False
 
-    SERVER_PORT = int(os.getenv("SERVER_PORT", 80))
+    LOG_LEVEL: ClassVar[str] = os.getenv("LOG_LEVEL", "INFO").upper()
 
+    DEBUG_SERVER: ClassVar[bool] = os.getenv("DEBUG_SERVER", "False").lower() in (
+        "true",
+        "1",
+        "t",
+    )
+
+    SERVER_PORT: ClassVar[int] = int(os.getenv("SERVER_PORT", 80))
 
     # Keycloak Konfiguration
-    KEYCLOAK_HOST = os.getenv('KEYCLOAK_HOST', 'localhost:9090')
-    KEYCLOAK_REALM = os.getenv('KEYCLOAK_REALM', 'biletado')
-    
-    KEYCLOAK_URL = f"http://{KEYCLOAK_HOST}/auth/realms/{KEYCLOAK_REALM}"
-    KEYCLOAK_CERTS_URL = f"http://{KEYCLOAK_HOST}/auth/realms/{KEYCLOAK_REALM}/protocol/openid-connect/certs"
+    KEYCLOAK_HOST: ClassVar[str] = os.getenv("KEYCLOAK_HOST", "localhost:9090")
+    KEYCLOAK_REALM: ClassVar[str] = os.getenv("KEYCLOAK_REALM", "biletado")
+
+    KEYCLOAK_URL: ClassVar[str] = f"http://{KEYCLOAK_HOST}/auth/realms/{KEYCLOAK_REALM}"
+    KEYCLOAK_CERTS_URL: ClassVar[str] = (
+        f"http://{KEYCLOAK_HOST}/auth/realms/{KEYCLOAK_REALM}/protocol/openid-connect/certs"
+    )
