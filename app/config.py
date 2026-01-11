@@ -48,7 +48,7 @@ class Config:
         "t",
     )
 
-    SERVER_PORT: ClassVar[int] = int(os.getenv("SERVER_PORT", 80))
+    SERVER_PORT: ClassVar[int] = int(os.getenv("SERVER_PORT", 9099))
 
     # Keycloak Konfiguration
     KEYCLOAK_HOST: ClassVar[str] = os.getenv("KEYCLOAK_HOST", "localhost:9090")
