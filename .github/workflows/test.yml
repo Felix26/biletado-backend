@@ -20,7 +20,21 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: Install Podman
+      run: sudo apt-get update && sudo apt-get install -y podman
+
     - name: Run tests with pytest
       run: |
         export PYTHONPATH=$PYTHONPATH:$(pwd)
         pytest --junitxml=result.xml
+
+    - name: Upload Test Results
+      if: always() # Uploads even if tests fail
+      uses: actions/upload-artifact@v4
+      with:
+        name: pytest-results
+        path: result.xml
+
+    - name: Build Image with Podman
+      run: |
+        podman build -t biletado-backend:latest .
